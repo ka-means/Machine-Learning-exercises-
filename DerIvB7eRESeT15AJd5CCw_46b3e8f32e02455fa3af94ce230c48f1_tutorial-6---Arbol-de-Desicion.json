@@ -1,0 +1,422 @@
+{
+ "cells": [
+  {
+   "attachments": {},
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Árboles de decisión\n",
+    "### Implementación a mano y uso de librería en sklearn"
+   ]
+  },
+  {
+   "attachments": {},
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "<!-- ![a](https://files.ai-pool.com/a/aba6fb4dcd4c3d01372085631f47d122.png) -->\n",
+    "<img src=\"https://files.ai-pool.com/a/aba6fb4dcd4c3d01372085631f47d122.png\" width=\"40%\" />\n",
+    "\n",
+    "Los árboles de decisión son una herramienta de clasificación que utiliza una estructura de árbol para su toma de decisiones, en particular, utiliza a un modelo de condiciones estructuradas de forma jerárquica para determinar la etiqueta asociada a cada dato. Para construir un árbol de decisión deberemos indicar mediante una métrica de separabilidad de los datos qué características nos son más útiles para llevar a cabo este proceso."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Función que nos permite calcular el logaritmo de base de 2 de un número\n",
+    "from math import log2\n",
+    "import pandas as pd\n",
+    "\n",
+    "# Importamos DecisionTree de su implementación en sklearn para construir el Random Forest\n",
+    "from sklearn.tree import DecisionTreeClassifier\n",
+    "from sklearn.tree import export_text"
+   ]
+  },
+  {
+   "attachments": {},
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Crearemos un set de datos que nos ayudarán a predecir si un partido de Tenis se jugará o no dependiendo de las condiciones climáticas\n",
+    "\n",
+    "\n",
+    "| Outlook | Temperature | Humidity | Wind | Plays |\n",
+    "|:-------:|:-----------:|:--------:|:----:| :---: |\n",
+    "|  Sunny  |     Hot     |   High   | Weak |  No   |\n",
+    "|  Rain   |     Mild    |  Normal  | Weak |  Yes  |\n",
+    "| ... | ... | ... | ... | ... |"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "random_state = 0\n",
+    "\n",
+    "# Definición del set de datos y los nombres de sus atributos\n",
+    "headers = ['Outlook', 'Temperature', 'Humidity', 'Wind', 'Plays']\n",
+    "\n",
+    "data=[['Sunny','Hot','High','Weak','No'],\n",
+    "      ['Sunny','Hot','High','Strong','No'],\n",
+    "      ['Overcast','Hot','High','Weak','Yes'],\n",
+    "      ['Rain','Mild','High','Weak','Yes'],\n",
+    "      ['Rain','Cool','Normal','Weak','Yes'],\n",
+    "      ['Rain','Cool','Normal','Strong','No'],\n",
+    "      ['Overcast','Cool','Normal','Strong','Yes'],\n",
+    "      ['Sunny','Mild','High','Weak','No'],\n",
+    "      ['Sunny','Cool','Normal','Weak','Yes'],\n",
+    "      ['Rain','Mild','Normal','Weak','Yes'],\n",
+    "      ['Sunny','Mild','Normal','Strong','Yes'],\n",
+    "      ['Overcast','Mild','High','Strong','Yes'],\n",
+    "      ['Overcast','Hot','Normal','Weak','Yes'],\n",
+    "      ['Rain','Mild','High','Strong','No']]"
+   ]
+  },
+  {
+   "attachments": {},
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Definiremos el nodo de un árbol, que contiene la columna que tiene asociada y el valor del atributo que llevó a este nodo"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "class DecisionNode:\n",
+    "    def __init__(self, col = -1, value = '', branches = None, results = None):\n",
+    "        self.col=col\n",
+    "        self.value = value\n",
+    "        self.results=results\n",
+    "        self.branches = branches"
+   ]
+  },
+  {
+   "attachments": {},
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Definiremos una función que nos permita determinar la cantidad de datos para cada una de las clases:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "{'No': 5, 'Yes': 9}"
+      ]
+     },
+     "execution_count": 4,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "# Conteo de registros pertenecientes a cada clase\n",
+    "def unique_counts(rows):\n",
+    "    results = {}\n",
+    "    for row in rows:\n",
+    "        r = row[-1]\n",
+    "        if r not in results: \n",
+    "            results[r] = 0\n",
+    "        results[r] += 1\n",
+    "    return results\n",
+    "\n",
+    "unique_counts(data)"
+   ]
+  },
+  {
+   "attachments": {},
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Ahora, definiremos una serie de funciones que nos permitirá trabajar con este set de datos para crear un árbol de decisión"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "0.9402859586706311"
+      ]
+     },
+     "execution_count": 5,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "# La entropía es una métrica que mide la capacidad de separación sobre los datos de una característica\n",
+    "\n",
+    "def entropy(rows):\n",
+    "    # We find a label to measure the degree of separation with\n",
+    "    results = unique_counts(rows)\n",
+    "    \n",
+    "    # Now calculate the entropy\n",
+    "    ent = 0.0\n",
+    "    for r in results.keys():\n",
+    "        p = float(results[r]) / len(rows) \n",
+    "        ent = ent - p * log2(p)\n",
+    "    return ent\n",
+    "\n",
+    "entropy(data)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "{'Sunny': [['Sunny', 'Hot', 'High', 'Weak', 'No'],\n",
+       "  ['Sunny', 'Hot', 'High', 'Strong', 'No'],\n",
+       "  ['Sunny', 'Mild', 'High', 'Weak', 'No'],\n",
+       "  ['Sunny', 'Cool', 'Normal', 'Weak', 'Yes'],\n",
+       "  ['Sunny', 'Mild', 'Normal', 'Strong', 'Yes']],\n",
+       " 'Overcast': [['Overcast', 'Hot', 'High', 'Weak', 'Yes'],\n",
+       "  ['Overcast', 'Cool', 'Normal', 'Strong', 'Yes'],\n",
+       "  ['Overcast', 'Mild', 'High', 'Strong', 'Yes'],\n",
+       "  ['Overcast', 'Hot', 'Normal', 'Weak', 'Yes']],\n",
+       " 'Rain': [['Rain', 'Mild', 'High', 'Weak', 'Yes'],\n",
+       "  ['Rain', 'Cool', 'Normal', 'Weak', 'Yes'],\n",
+       "  ['Rain', 'Cool', 'Normal', 'Strong', 'No'],\n",
+       "  ['Rain', 'Mild', 'Normal', 'Weak', 'Yes'],\n",
+       "  ['Rain', 'Mild', 'High', 'Strong', 'No']]}"
+      ]
+     },
+     "execution_count": 6,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "# División del set de datos de acuerdo a los valores de un atributo\n",
+    "# recibe una lista de listas en el argumento \"rows\", cada una correspondiente a una fila de los datos\n",
+    "# recibe una índice en el argumento \"column\", que indica bajo qué columna separaremos los datos\n",
+    "\n",
+    "def divide_set(rows, column):\n",
+    "    sets = dict()\n",
+    "    for row in rows:\n",
+    "        if row[column] not in sets.keys():\n",
+    "            sets[row[column]] = []\n",
+    "        sets[row[column]].append(row)\n",
+    "    return sets\n",
+    "\n",
+    "divide_set(data, 0)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Construcción del árbol usando ganancia de información\n",
+    "\n",
+    "def build_tree(rows, headers, value = ''):\n",
+    "    # En caso de tener un árbol vacío, retornamos un nodo vacío\n",
+    "    if len(rows) == 0: \n",
+    "        return DecisionNode(value = value)\n",
+    "    \n",
+    "    # En caso de tener una sola columna, creamos un único separador en base a ellas\n",
+    "    elif len(set([row[-1] for row in rows])) == 1:\n",
+    "        return DecisionNode(value = value, results = unique_counts(rows))\n",
+    "    \n",
+    "    # Si tenemos múltiples columnas llevamos a cabo el siguiente proceso:\n",
+    "    current_score = entropy(rows)\n",
+    "    best_gain = 0.0\n",
+    "    best_criteria = None\n",
+    "    best_sets = None\n",
+    "    column_count = len(rows[0]) - 1\n",
+    "\n",
+    "    for col in range(0, column_count):\n",
+    "        # Dividimos el set de datos acorde a los valores de la columna \"col\"\n",
+    "        sets = divide_set(rows, col)\n",
+    "        gain = current_score\n",
+    "\n",
+    "        # Para cada valor único de la columna \"col\", calculamos qué fracción de las filas separa,\n",
+    "        # luego, multiplicamos este factor por la entropía de la característica sobre la etiqueta a predecir\n",
+    "        for key in sets.keys():\n",
+    "            s = float(len(sets[key])) / len(rows)\n",
+    "            gain -= s * entropy(sets[key])\n",
+    "\n",
+    "        # Almacenamos aquella columna con mejor ganancia hasta el momento\n",
+    "        if gain > best_gain:\n",
+    "            best_gain = gain\n",
+    "            best_criteria = headers[col]\n",
+    "            best_sets = sets\n",
+    "\n",
+    "    branches = []\n",
+    "    # Cara cada valor de las mejor característica, crearemos un sub-árbol que lo separe hasta llegar a una sola columna\n",
+    "    for s in best_sets:\n",
+    "        branches.append(build_tree(best_sets[s], headers, s))\n",
+    "\n",
+    "    # Retornamos el nodo inicial del árbol, con la primera mejor caracaterística de separador\n",
+    "    return DecisionNode(col = best_criteria, value = value, branches = branches)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Función para imprimir el árbol de decisión construido\n",
+    "def print_tree(tree, indent = ''):\n",
+    "    if tree.results != None:\n",
+    "        print(indent + str(tree.results))\n",
+    "    else:\n",
+    "        if tree.value == '':\n",
+    "            print(indent + tree.col + \"?\")\n",
+    "        for branch in tree.branches:\n",
+    "            to_print = indent + '  ' + branch.value + \" -> \"\n",
+    "            if branch.col != -1:\n",
+    "                print(to_print + branch.col + \"?\")\n",
+    "                print_tree(branch, ' '*len(to_print))\n",
+    "            else:\n",
+    "                print(to_print + str(branch.results))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Outlook?\n",
+      "  Sunny -> Humidity?\n",
+      "             High -> {'No': 3}\n",
+      "             Normal -> {'Yes': 2}\n",
+      "  Overcast -> {'Yes': 4}\n",
+      "  Rain -> Wind?\n",
+      "            Weak -> {'Yes': 3}\n",
+      "            Strong -> {'No': 2}\n"
+     ]
+    }
+   ],
+   "source": [
+    "print_tree(build_tree(data, headers))"
+   ]
+  },
+  {
+   "attachments": {},
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Ahora, utilizamos la implementación de ``sklearn`` de ``DecisionTreeClassifier``"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Creamos un DataFrame con nuestros datos\n",
+    "df = pd.DataFrame(data, columns = headers)\n",
+    "\n",
+    "# Pasamos de valores en texto a valores numéricos:\n",
+    "for column_name in df.columns:\n",
+    "    df[column_name] = df[column_name].astype('category').cat.codes\n",
+    "\n",
+    "# Separamos entre matriz de características y vector de etiquetas\n",
+    "X = df.drop(\"Plays\", axis=1)\n",
+    "y = df[\"Plays\"]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "|--- feature_0 <= 0.50\n",
+      "|   |--- class: 1\n",
+      "|--- feature_0 >  0.50\n",
+      "|   |--- feature_2 <= 0.50\n",
+      "|   |   |--- feature_0 <= 1.50\n",
+      "|   |   |   |--- feature_3 <= 0.50\n",
+      "|   |   |   |   |--- class: 0\n",
+      "|   |   |   |--- feature_3 >  0.50\n",
+      "|   |   |   |   |--- class: 1\n",
+      "|   |   |--- feature_0 >  1.50\n",
+      "|   |   |   |--- class: 0\n",
+      "|   |--- feature_2 >  0.50\n",
+      "|   |   |--- feature_3 <= 0.50\n",
+      "|   |   |   |--- feature_1 <= 1.00\n",
+      "|   |   |   |   |--- class: 0\n",
+      "|   |   |   |--- feature_1 >  1.00\n",
+      "|   |   |   |   |--- class: 1\n",
+      "|   |   |--- feature_3 >  0.50\n",
+      "|   |   |   |--- class: 1\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "tree = DecisionTreeClassifier(criterion = \"entropy\", random_state = random_state)\n",
+    "tree.fit(X, y)\n",
+    "\n",
+    "print(export_text(tree))"
+   ]
+  },
+  {
+   "attachments": {},
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Conclusión\n",
+    "\n",
+    "- Los árboles de decisión utilizan una estructura jerárquica para su construcción y toma de decisiones, priorizando características más informativas en bases a una determinada métrica.\n",
+    "- La entropía es un método de determinar la capacidad informativa de una característica, esta busca determinar qué tanto separan cada uno de sus valores únicos las etiquetas que luego buscamos predecir.\n",
+    "- ``sklearn`` provee su propio método para implementar árboles de decisión (``DecisionTreeClassifier``), para su uso deberemos trabajar los datos en un formato numérico y en forma de matrices o DataFrames."
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.7.9"
+  },
+  "orig_nbformat": 4
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
