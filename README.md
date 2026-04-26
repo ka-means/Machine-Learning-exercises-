@@ -1,13 +1,37 @@
-## 📌 Repository description
+# Machine Learning Exercises
 
-This repository contains my solutions to the programming assignments and exercises of the **Machine Learning** course, which belongs to the **Master in Data Science** at [University Name].
+This repository contains my individual and team assignments from the **Machine Learning course** offered by the **Master in Data Science** at Pontificia Universidad Catolica de Chile. I took this course as an elective during my **Master in Business Analytics (BA)**.
 
-I took this course as an **elective** during my **Master in Business Analytics (BA)**. This cross-program enrollment allowed me to combine rigorous ML methods with the business problem‑framing perspective I developed in my BA program.
+## 📚 Course content & graded tasks
 
-The exercises cover topics such as:
-- Linear and logistic regression
-- Decision trees and random forests
-- Support vector machines
-- Clustering (K‑means, hierarchical)
-- Dimensionality reduction (PCA)
-- Basic neural networks
+The exercises cover the following topics, each linked to a specific graded task:
+
+| Topic | Task |
+|-------|------|
+| Model tuning | Hyperparameter optimization (scikit-learn, GridSearchCV) |
+| K‑Nearest Neighbors & Decision Trees | Summative test + practical implementation |
+| Feature space partitioning | Partitioning methods (e.g., recursive binary splitting) |
+| Support Vector Machines (SVM) | Summative test + comparative analysis |
+| SVM vs Artificial Neural Networks (ANN) | Performance comparison on a given dataset |
+| Clustering techniques | K‑means, hierarchical clustering (summative test) |
+
+Additionally, a **final team project** (25% of grade) involved building a complete ML system on a real‑world dataset – from data preprocessing to model evaluation and interpretation.
+
+## 🎯 Why this matters
+
+Taking this Data Science master’s course as part of my BA master allowed me to:
+- Combine rigorous ML methods with business problem‑framing.
+- Work on real‑world data in a collaborative team environment.
+- Achieve a final grade of **100%** in several assignments.
+
+## 📂 Repository structure
+
+Each exercise is organized in its own folder with:
+- Jupyter notebook / Python script
+- Brief problem statement (in folder's README)
+- Results and key takeaways
+
+## 🛠️ Requirements
+
+See `requirements.txt` (Python 3.9+, scikit-learn, pandas, numpy, matplotlib, seaborn, tensorflow/keras for ANN).
+
